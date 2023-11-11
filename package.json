@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "migrate": "nodemon ./server/migrations/migrations.js"
   },
   "author": "Iliyan Alinski",
   "license": "ISC",
