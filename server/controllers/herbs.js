@@ -5,7 +5,17 @@ async function herbs(req, res) {
     const perPage = 5
     const page = req.query.page || 1
 
-    const data = await Herb.aggregate([{ $sort: { createdAt: -1 } }])
+    const data = await Herb.aggregate([
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: "regions",
+          localField: "regionId",
+          foreignField: "_id",
+          as: "region",
+        },
+      },
+    ])
       .skip(perPage * page - perPage)
       .limit(perPage)
       .exec()
@@ -26,8 +36,14 @@ async function herbs(req, res) {
 }
 
 async function herb(req, res) {
+  const { id } = req.params
+
+  if (!id) {
+    return res.status(400).json({ message: "Herb id is not provided." })
+  }
+
   try {
-    const data = await Herb.findById({ _id: req.params.id })
+    const data = await Herb.findById({ _id: id })
 
     res.json({
       data,
@@ -40,6 +56,10 @@ async function herb(req, res) {
 
 async function removeHerb(req, res) {
   const { id } = req.params
+
+  if (!id) {
+    return res.status(400).json({ message: "Herb id is not provided." })
+  }
 
   try {
     const data = await Herb.findByIdAndRemove({ _id: id })
@@ -65,7 +85,7 @@ async function removeHerb(req, res) {
 
 async function createHerb(req, res) {
   try {
-    const { title, description } = req.body
+    const { title, description, regionId } = req.body
 
     if (!title) {
       return res.status(400).json({ message: "Title is required." })
@@ -75,9 +95,14 @@ async function createHerb(req, res) {
       return res.status(400).json({ message: "Description is required." })
     }
 
+    if (!regionId) {
+      return res.status(400).json({ message: "Region is required." })
+    }
+
     const data = await Herb.create({
       title,
       description,
+      regionId,
     })
 
     res.json({
@@ -102,11 +127,20 @@ async function updateHerb(req, res) {
       return res.status(400).json({ message: "Description is required." })
     }
 
+    if (!id) {
+      return res.status(400).json({ message: "Herb id is not provided." })
+    }
+
+    if (!regionId) {
+      return res.status(400).json({ message: "Region is required." })
+    }
+
     const data = await Herb.findByIdAndUpdate(
       { _id: id },
       {
         title,
         description,
+        regionId
       },
       { new: true }
     )
@@ -120,10 +154,56 @@ async function updateHerb(req, res) {
   }
 }
 
+async function addComment(req, res) {
+  try {
+    const { comment, userId } = req.body
+    const { id } = req.params
+
+    if (!comment) {
+      return res.status(400).json({ message: "Comment field is empty." })
+    }
+
+    if (!userId) {
+      return res.status(400).json({ message: "Comment must contain user id." })
+    }
+
+    if (!id) {
+      return res
+        .status(400)
+        .json({ message: "Comment must be addressed to a certain post." })
+    }
+
+    const commentData = {
+      _id: new Date().getTime(),
+      comment,
+      userId,
+      createdAt: new Date(),
+    }
+
+    await Herb.findByIdAndUpdate(
+      { _id: id },
+      {
+        $push: {
+          comments: commentData,
+        },
+      },
+      { new: true }
+    )
+
+    res.json({
+      data: commentData,
+    })
+  } catch (error) {
+    console.log(error)
+    req.status(500).json({ message: "Server error" })
+  }
+}
+
 module.exports = {
   herb,
   herbs,
   createHerb,
   removeHerb,
   updateHerb,
+  addComment,
 }
